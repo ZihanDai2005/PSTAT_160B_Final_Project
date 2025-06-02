@@ -2,8 +2,9 @@ import numpy as np
 import time
 import shutil
 import random
+from deciphering_utils import scramble_text, calculate_text_similarity
 
-def metropolis_hastings(initial_state, proposal_function, log_density, iters=1000, print_every=10, tolerance=0.02, error_function=None, pretty_state=None):
+def metropolis_hastings(initial_state, proposal_function, log_density, iters=1000, print_every=10, tolerance=0.02, error_function=None, pretty_state=None, ground_truth_text_chars=None):
     """
     Runs a metropolis hastings algorithm given the settings
     
@@ -89,10 +90,14 @@ def metropolis_hastings(initial_state, proposal_function, log_density, iters=100
                 if pretty_state is not None:
                     s = "\n" + pretty_state(state)
                 print(shutil.get_terminal_size().columns*'-')
-                print("\n Entropy : ", round(p1,4), 
-                    ", Iteration : ", it, 
-                    ", Acceptance Probability : ", 
-                    round(acceptance,4))
+                print_str = "\n Entropy: " + str(round(p1,4)) + \
+                            " , Iteration: " + str(it) + \
+                            " , Acceptance Probability: " + str(round(acceptance,4))
+                if ground_truth_text_chars is not None:
+                    deciphered = scramble_text(state["text"], state["permutation_map"])
+                    acc = calculate_text_similarity(ground_truth_text_chars, deciphered)
+                    print_str += " , Accuracy : " + str(round(acc, 2)) + "%"
+                print(print_str)
                 print(shutil.get_terminal_size().columns*'-')
                 print(s)
                 

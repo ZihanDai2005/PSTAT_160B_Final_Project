@@ -1,6 +1,8 @@
 import numpy as np
 import random
 from utils import *
+import math
+import copy
 
 def compute_log_probability(text, permutation_map, char_to_ix, frequency_statistics, transition_matrix):
     """
@@ -175,3 +177,116 @@ def pretty_state(state, full=True):
         return pretty_string(scramble_text(state["text"][1:200], state["permutation_map"]), full)
     else:
         return pretty_string(scramble_text(state["text"], state["permutation_map"]), full)
+
+
+def weighted_proposal(state, log_density, sample_k=100):
+    """
+    Weighted proposal function for the Metropolis-Hastings algorithm.
+
+    Compared to the original random swap strategy (e.g., propose_a_move),
+    this function prioritizes swaps that are likely to improve the log-likelihood,
+    thus improving acceptance rate and convergence speed.
+
+    Args:
+        state (dict): Current state containing fields like permutation_map, text, etc.
+        log_density (function): A function that computes log-probability of the state.
+        sample_k (int): Maximum number of candidate swaps to evaluate (for efficiency).
+
+    Returns:
+        proposed_state (dict): A new proposed state with a permutation_map updated via a weighted swap.
+    """
+    current_score = log_density(state)
+    keys = list(state["permutation_map"].keys())
+    n = len(keys)
+
+    candidates = []
+    weights = []
+
+    all_pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
+    sampled_pairs = random.sample(all_pairs, min(sample_k, len(all_pairs)))
+
+    for i, j in sampled_pairs:
+        # Create a deep copy of the permutation map
+        new_perm_map = copy.deepcopy(state["permutation_map"])
+        ki, kj = keys[i], keys[j]
+        new_perm_map[ki], new_perm_map[kj] = new_perm_map[kj], new_perm_map[ki]
+
+        # Build a new state with the swapped permutation
+        new_state = dict(state)
+        new_state["permutation_map"] = new_perm_map
+
+        new_score = log_density(new_state)
+        delta = new_score - current_score
+        weight = math.exp(delta) if delta < 0 else delta
+
+        if weight > 0:
+            candidates.append((ki, kj))
+            weights.append(weight)
+
+    if not candidates:
+        return propose_a_move(state)
+
+    selected_idx = random.choices(range(len(candidates)), weights=weights, k=1)[0]
+    ki, kj = candidates[selected_idx]
+
+    proposed_perm_map = copy.deepcopy(state["permutation_map"])
+    proposed_perm_map[ki], proposed_perm_map[kj] = proposed_perm_map[kj], proposed_perm_map[ki]
+
+    proposed_state = dict(state)
+    proposed_state["permutation_map"] = proposed_perm_map
+
+    return proposed_state
+
+def load_text_as_chars(filepath):
+    """
+    Reads a text file and returns its content as a list of characters.
+
+    Args:
+        filepath (str): The path to the .txt file.
+
+    Returns:
+        list: A list of characters from the file.
+              Returns an empty list if the file cannot be read or is empty.
+    """
+    try:
+        with open(filepath, 'r', encoding='utf-8') as file:
+            content = file.read()
+            return list(content)
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return []
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return []
+
+
+def calculate_text_similarity(original_text_chars, deciphered_text_chars):
+    """
+    Calculates the character-by-character similarity percentage between two texts.
+
+    Args:
+        original_text_chars (list): A list of characters for the original, known plaintext.
+        deciphered_text_chars (list): A list of characters for the text deciphered by the algorithm.
+
+    Returns:
+        float: The similarity percentage (from 0.0 to 100.0).
+               Returns 0.0 if texts are empty or have different lengths (as direct
+               comparison is then not straightforward for substitution cipher evaluation).
+    """
+    if not original_text_chars or not deciphered_text_chars:
+        print("Warning: One or both texts are empty.")
+        return 0.0
+
+    if len(original_text_chars) != len(deciphered_text_chars):
+        print("Warning: Texts have different lengths. Similarity is 0.0 as direct comparison is invalid.")
+        return 0.0
+    
+    text_length = len(original_text_chars)
+    if text_length == 0: # Should be caught by the first check, but good for safety
+        return 100.0 # Or 0.0, depending on how you define similarity for empty strings
+
+    # Use the existing compute_difference function
+    differences = compute_difference(original_text_chars, deciphered_text_chars)
+
+    similarity_ratio = (text_length - differences) / text_length
+    return similarity_ratio * 100.0

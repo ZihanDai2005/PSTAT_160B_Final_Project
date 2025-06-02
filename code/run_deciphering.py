@@ -9,6 +9,8 @@ from optparse import OptionParser
 
 
 def main(argv):
+   ground_truth_text_chars = load_text_as_chars("original.txt")
+
    inputfile = None
    decodefile = None
    parser = OptionParser()
@@ -53,8 +55,12 @@ def main(argv):
       iters = options.iterations
       print_every = int(options.print_every)
       tolerance = options.tolerance
+      '''
       state, lps, _ = metropolis_hastings(initial_state, proposal_function=propose_a_move, log_density=compute_probability_of_state, 
-                                            iters=iters, print_every=print_every, tolerance=tolerance, pretty_state=pretty_state)
+                                            iters=iters, print_every=print_every, tolerance=tolerance, pretty_state=pretty_state, ground_truth_text_chars=ground_truth_text_chars)
+      '''
+      state, lps, _ = metropolis_hastings(initial_state, proposal_function=lambda s: weighted_proposal(s, compute_probability_of_state), log_density=compute_probability_of_state, 
+                                            iters=iters, print_every=print_every, tolerance=tolerance, pretty_state=pretty_state, ground_truth_text_chars=ground_truth_text_chars)
       states.extend(state)
       entropies.extend(lps)
       i += 1
@@ -67,9 +73,23 @@ def main(argv):
    print(" Best Guesses : \n")
    
    for j in range(1,4):
+      best_state = p[-j][0]
+      deciphered_text = scramble_text(best_state["text"], best_state["permutation_map"])
+      accuracy = calculate_text_similarity(ground_truth_text_chars, deciphered_text)
+
+      print(f"Guess {j}: \n")
+      print(pretty_state(best_state, full=True))
+      print(f"Accuracy: {accuracy:.2f}%")
+      print(shutil.get_terminal_size().columns * '*')
+
+      '''
       print(f"Guess {j}: \n")
       print(pretty_state(p[-j][0], full=True))
       print(shutil.get_terminal_size().columns*'*')
+      '''
    
 if __name__ == "__main__":
    main(sys.argv)
+
+   original_text_filepath = "original.txt" 
+   original_plaintext_chars = load_text_as_chars(original_text_filepath)

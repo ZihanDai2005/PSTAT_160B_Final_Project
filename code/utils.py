@@ -1,8 +1,7 @@
 import numpy as np
 import shutil
 import random
-from copy import deepcopy
-from copy import copy
+import copy
 
 def az_list():
     """
@@ -79,7 +78,7 @@ def shuffle_text(text, i1, i2):
     
     y = text[i1:i2]
     random.shuffle(y)
-    t = copy(text)
+    t = copy.copy(text)
     t[i1:i2] = y
     return t
     
@@ -97,7 +96,7 @@ def move_one_step(p_map):
     keys = az_list()
     sample = random.sample(keys, 2)
     
-    p_map_2 = deepcopy(p_map)
+    p_map_2 = copy.deepcopy(p_map)
     p_map_2[sample[1]] = p_map[sample[0]]
     p_map_2[sample[0]] = p_map[sample[1]]
     
