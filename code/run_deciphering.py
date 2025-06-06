@@ -55,12 +55,18 @@ def main(argv):
       iters = options.iterations
       print_every = int(options.print_every)
       tolerance = options.tolerance
-      '''
-      state, lps, _ = metropolis_hastings(initial_state, proposal_function=propose_a_move, log_density=compute_probability_of_state, 
-                                            iters=iters, print_every=print_every, tolerance=tolerance, pretty_state=pretty_state, ground_truth_text_chars=ground_truth_text_chars)
-      '''
-      state, lps, _ = metropolis_hastings(initial_state, proposal_function=lambda s: weighted_proposal(s, compute_probability_of_state), log_density=compute_probability_of_state, 
-                                            iters=iters, print_every=print_every, tolerance=tolerance, pretty_state=pretty_state, ground_truth_text_chars=ground_truth_text_chars)
+      
+      state, lps, _ = metropolis_hastings(
+         initial_state,
+         proposal_function=propose_a_move,
+         log_density=compute_probability_of_state,
+         iters=iters,
+         print_every=print_every,
+         tolerance=tolerance,
+         pretty_state=pretty_state,
+         ground_truth_text_chars=ground_truth_text_chars
+      )
+      
       states.extend(state)
       entropies.extend(lps)
       i += 1

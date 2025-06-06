@@ -2,115 +2,73 @@ import numpy as np
 import time
 import shutil
 import random
-from deciphering_utils import scramble_text, calculate_text_similarity
+from deciphering_utils import weighted_proposal, propose_a_move
 
-def metropolis_hastings(initial_state, proposal_function, log_density, iters=1000, print_every=10, tolerance=0.02, error_function=None, pretty_state=None, ground_truth_text_chars=None):
+def metropolis_hastings(initial_state, proposal_function, log_density, iters=1000, print_every=500,
+                        tolerance=0.02, temperature=1.0, cooling_rate=1.0, error_function=None,
+                        pretty_state=None, ground_truth_text_chars=None):
     """
-    Runs a metropolis hastings algorithm given the settings
-    
-    Arguments:
-    
-    initial_state: state from where we should start moving
-    
-    proposal_function: proposal function for next state, it takes the current state
-                       and returns the next state
-                       
-    log_density: log probability(upto an unknown normalization constant) function, takes a 
-                 state as input, and gives the log(probability*some constant) of the state.
-    
-    iters: number of iters to continue
-    
-    print_every: print every $ iterations the current statistics. For diagnostics purposes.
-    
-    tolerance: if acceptance rate drops below this, we stop the simulation
-    
-    error_function: computes the error for current state. Printed every print_every iterations.
-                    Just for your diagnostics.
-    
-    pretty_state: A function from your side to print the current state in a pretty format.
-    
-    Returns:
-    
-    states: List of states generated during simulation
-    
-    cross_entropies: list of negative log probabilites during the simulation.
-    
-    errors: lists of errors generated if given error_function, none otherwise.
-    
+    Extended Metropolis-Hastings with support for:
+    - Weighted proposal with asymmetric q(x, y)
+    - Temperature-based acceptance (simulated annealing)
     """
-    
+
     p1 = log_density(initial_state)
+    state = initial_state
+
     errors = []
     cross_entropies = []
-    
-    state = initial_state
-    cnt = 0
-    accept_cnt = 0
-    error = -1
     states = [initial_state]
-    it = 0
-    prints = 0
-    entropy_print = 100000
+
+    cnt, accept_cnt, it = 0, 0, 0
+
     while it < iters:
+        if proposal_function.__name__ == "weighted_proposal":
+            proposed_state, swap_info, q_xy = weighted_proposal(state, log_density)
+            _, _, q_yx = weighted_proposal(proposed_state, log_density)  # Reverse move
+        else:
+            proposed_state = proposal_function(state)
+            q_xy = q_yx = 1.0  # symmetric case
 
-        #propose a move
-        new_state = proposal_function(state)
-        p2 = log_density(new_state)
-        
-        u = random.random()
+        p2 = log_density(proposed_state)
         cnt += 1
-        
-        #accept the new move with probability p2-p1
-        if p2-p1 > np.log(u):
 
-            #update the state
-            state = new_state
-            
-            #increment the iteration counter
-            it += 1
-            
-            #increment the acceptance counter
-            accept_cnt += 1
-            
-            #update the current state probability
+        # Adjust acceptance probability with temp and asymmetric q
+        acceptance_ratio = (p2 - p1) / temperature + np.log(q_yx / q_xy)
+        if np.log(random.random()) < acceptance_ratio:
+            state = proposed_state
             p1 = p2
-            
-            #append errors and states
+            it += 1
+            accept_cnt += 1
+
             cross_entropies.append(p1)
             states.append(state)
-            if error_function is not None:
+
+            if error_function:
                 error = error_function(state)
                 errors.append(error)
-                
-            #print if required
-            if -p1 < 0.995 * entropy_print: 
-                entropy_print = -p1
-                acceptance = float(accept_cnt)/float(cnt)
-                s = ""
-                if pretty_state is not None:
-                    s = "\n" + pretty_state(state)
-                print(shutil.get_terminal_size().columns*'-')
-                print_str = "\n Entropy: " + str(round(p1,4)) + \
-                            " , Iteration: " + str(it) + \
-                            " , Acceptance Probability: " + str(round(acceptance,4))
-                if ground_truth_text_chars is not None:
+
+            if it % print_every == 0:
+                acc_rate = accept_cnt / cnt
+                acc_log = f"\n Entropy: {p1:.4f}, Iteration: {it}, Acceptance Rate: {acc_rate:.4f}"
+
+                if ground_truth_text_chars:
                     deciphered = scramble_text(state["text"], state["permutation_map"])
-                    acc = calculate_text_similarity(ground_truth_text_chars, deciphered)
-                    print_str += " , Accuracy : " + str(round(acc, 2)) + "%"
-                print(print_str)
-                print(shutil.get_terminal_size().columns*'-')
-                print(s)
-                
-                if acceptance < tolerance:
+                    accuracy = calculate_text_similarity(ground_truth_text_chars, deciphered)
+                    acc_log += f", Accuracy: {accuracy:.2f}%"
+
+                print("-" * shutil.get_terminal_size().columns)
+                print(acc_log)
+                print("-" * shutil.get_terminal_size().columns)
+                if pretty_state:
+                    print(pretty_state(state))
+
+                if acc_rate < tolerance:
                     break
-                
+
                 cnt = 0
                 accept_cnt = 0
 
-                #sleep to see output
-                time.sleep(.1)
-    
-    if error_function is None:
-        errors = None
-    
-    return states, cross_entropies, errors
+        temperature *= cooling_rate  # Apply annealing schedule
+
+    return states, cross_entropies, errors if error_function else None

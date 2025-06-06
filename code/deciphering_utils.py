@@ -179,64 +179,6 @@ def pretty_state(state, full=True):
         return pretty_string(scramble_text(state["text"], state["permutation_map"]), full)
 
 
-def weighted_proposal(state, log_density, sample_k=100):
-    """
-    Weighted proposal function for the Metropolis-Hastings algorithm.
-
-    Compared to the original random swap strategy (e.g., propose_a_move),
-    this function prioritizes swaps that are likely to improve the log-likelihood,
-    thus improving acceptance rate and convergence speed.
-
-    Args:
-        state (dict): Current state containing fields like permutation_map, text, etc.
-        log_density (function): A function that computes log-probability of the state.
-        sample_k (int): Maximum number of candidate swaps to evaluate (for efficiency).
-
-    Returns:
-        proposed_state (dict): A new proposed state with a permutation_map updated via a weighted swap.
-    """
-    current_score = log_density(state)
-    keys = list(state["permutation_map"].keys())
-    n = len(keys)
-
-    candidates = []
-    weights = []
-
-    all_pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
-    sampled_pairs = random.sample(all_pairs, min(sample_k, len(all_pairs)))
-
-    for i, j in sampled_pairs:
-        # Create a deep copy of the permutation map
-        new_perm_map = copy.deepcopy(state["permutation_map"])
-        ki, kj = keys[i], keys[j]
-        new_perm_map[ki], new_perm_map[kj] = new_perm_map[kj], new_perm_map[ki]
-
-        # Build a new state with the swapped permutation
-        new_state = dict(state)
-        new_state["permutation_map"] = new_perm_map
-
-        new_score = log_density(new_state)
-        delta = new_score - current_score
-        weight = math.exp(delta) if delta < 0 else delta
-
-        if weight > 0:
-            candidates.append((ki, kj))
-            weights.append(weight)
-
-    if not candidates:
-        return propose_a_move(state)
-
-    selected_idx = random.choices(range(len(candidates)), weights=weights, k=1)[0]
-    ki, kj = candidates[selected_idx]
-
-    proposed_perm_map = copy.deepcopy(state["permutation_map"])
-    proposed_perm_map[ki], proposed_perm_map[kj] = proposed_perm_map[kj], proposed_perm_map[ki]
-
-    proposed_state = dict(state)
-    proposed_state["permutation_map"] = proposed_perm_map
-
-    return proposed_state
-
 def load_text_as_chars(filepath):
     """
     Reads a text file and returns its content as a list of characters.
@@ -290,3 +232,58 @@ def calculate_text_similarity(original_text_chars, deciphered_text_chars):
 
     similarity_ratio = (text_length - differences) / text_length
     return similarity_ratio * 100.0
+
+def weighted_proposal(state, log_density, sample_k=100):
+    """
+    Weighted proposal function for the Metropolis-Hastings algorithm.
+
+    Compared to the original random swap strategy (e.g., propose_a_move),
+    this function prioritizes swaps that are likely to improve the log-likelihood,
+    thus improving acceptance rate and convergence speed.
+
+    Args:
+        state (dict): Current state containing fields like permutation_map, text, etc.
+        log_density (function): A function that computes log-probability of the state.
+        sample_k (int): Maximum number of candidate swaps to evaluate (for efficiency).
+
+    Returns:
+        proposed_state (dict): A new proposed state with a permutation_map updated via a weighted swap.
+    """
+    current_score = log_density(state)
+    keys = list(state["permutation_map"].keys())
+    n = len(keys)
+
+    candidates = []
+    weights = []
+
+    all_pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
+    sampled_pairs = random.sample(all_pairs, min(sample_k, len(all_pairs)))
+
+    for i, j in sampled_pairs:
+        new_perm_map = copy.deepcopy(state["permutation_map"])
+        ki, kj = keys[i], keys[j]
+        new_perm_map[ki], new_perm_map[kj] = new_perm_map[kj], new_perm_map[ki]
+
+        new_state = dict(state)
+        new_state["permutation_map"] = new_perm_map
+
+        new_score = log_density(new_state)
+        delta = new_score - current_score
+        weight = math.exp(delta) if delta < 0 else delta
+
+        if weight > 0:
+            candidates.append(((ki, kj), new_state))
+            weights.append(weight)
+
+    if not candidates:
+        # fallback to uniform move
+        fallback_state = propose_a_move(state)
+        return fallback_state, 1.0, 1.0
+
+    selected_idx = random.choices(range(len(candidates)), weights=weights, k=1)[0]
+    (ki, kj), proposed_state = candidates[selected_idx]
+
+    # Recalculate q(x, y)
+    q_xy = weights[selected_idx] / sum(weights)
+
+    return proposed_state, (ki, kj), q_xy
