@@ -2,7 +2,7 @@ import numpy as np
 import shutil
 import random
 import copy
-
+   
 def az_list():
     """
     Returns a default a-zA-Z characters list
@@ -107,9 +107,9 @@ def pretty_string(text, full=False):
     Pretty formatted string
     """
     if not full:
-        return ''.join(text[1:200]) #+ shutil.get_terminal_size().columns*'-'#'...'
+        return ''.join(text[1:200])
     else:
-        return ''.join(text) #+ shutil.get_terminal_size().columns*'-'#'...'
+        return ''.join(text)
     
 def compute_statistics(filename):
     """
