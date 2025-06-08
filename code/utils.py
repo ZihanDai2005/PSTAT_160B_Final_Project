@@ -7,7 +7,7 @@ def az_list():
     """
     Returns a default a-zA-Z characters list
     """
-    cx = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')
+    cx = list('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ()[]{}（）^°•@_ωд益﹏ノ╯ツ⌐■~!?:、☆★。→ー＝*$¯><')
     return cx
 
 def generate_random_permutation_map(chars):

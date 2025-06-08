@@ -204,33 +204,31 @@ def load_text_as_chars(filepath):
 
 def calculate_text_similarity(original_text_chars, deciphered_text_chars):
     """
-    Calculates the character-by-character similarity percentage between two texts.
+    Calculates the character-by-character similarity percentage between two texts,
+    even if they have different lengths (compares up to the shorter length).
 
     Args:
-        original_text_chars (list): A list of characters for the original, known plaintext.
-        deciphered_text_chars (list): A list of characters for the text deciphered by the algorithm.
+        original_text_chars (list): Original text as a list of characters.
+        deciphered_text_chars (list): Deciphered text as a list of characters.
 
     Returns:
-        float: The similarity percentage (from 0.0 to 100.0).
-               Returns 0.0 if texts are empty or have different lengths (as direct
-               comparison is then not straightforward for substitution cipher evaluation).
+        float: Similarity percentage (0.0 to 100.0), based on the overlapping portion.
+               Returns 0.0 if either text is empty.
     """
     if not original_text_chars or not deciphered_text_chars:
         print("Warning: One or both texts are empty.")
         return 0.0
 
-    if len(original_text_chars) != len(deciphered_text_chars):
-        print("Warning: Texts have different lengths. Similarity is 0.0 as direct comparison is invalid.")
+    min_length = min(len(original_text_chars), len(deciphered_text_chars))
+    if min_length == 0:
         return 0.0
-    
-    text_length = len(original_text_chars)
-    if text_length == 0: # Should be caught by the first check, but good for safety
-        return 100.0 # Or 0.0, depending on how you define similarity for empty strings
 
-    # Use the existing compute_difference function
-    differences = compute_difference(original_text_chars, deciphered_text_chars)
-
-    similarity_ratio = (text_length - differences) / text_length
+    # Only compare up to the shorter length
+    differences = compute_difference(
+        original_text_chars[:min_length], 
+        deciphered_text_chars[:min_length]
+    )
+    similarity_ratio = (min_length - differences) / min_length
     return similarity_ratio * 100.0
 
 def weighted_proposal(state, log_density, sample_k=100):

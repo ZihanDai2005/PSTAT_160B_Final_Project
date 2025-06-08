@@ -2,7 +2,7 @@ import numpy as np
 import time
 import shutil
 import random
-from deciphering_utils import weighted_proposal, propose_a_move
+from deciphering_utils import *
 
 def metropolis_hastings(initial_state, proposal_function, log_density, iters=1000, print_every=500,
                         tolerance=0.02, temperature=1.0, cooling_rate=1.0, error_function=None,
